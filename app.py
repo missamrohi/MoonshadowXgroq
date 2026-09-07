@@ -296,4 +296,54 @@ if st.button("🔥 Generate Posts", type="primary", disabled=btn_disabled):
                 )
 
                 raw_content = chat_completion.choices[0].message.content.strip()
-                clean_json = re.sub(r'^
+                clean_json = re.sub(r'^```json\s*|\s*```$', '', raw_content, flags=re.MULTILINE).strip()
+                captions = json.loads(clean_json)
+
+                st.session_state.previous_tweets.extend(captions)
+
+                st.subheader("🎉 Ready-to-Post Captions")
+
+                tabs_to_create = []
+                if lang_en:
+                    tabs_to_create.append("🇬🇧 Native English (10)")
+                if lang_hk:
+                    tabs_to_create.append("🇭🇰 HK Cantonese (10)")
+
+                tabs = st.tabs(tabs_to_create)
+
+                tab_idx = 0
+                if lang_en:
+                    with tabs[tab_idx]:
+                        start_i = 0
+                        end_i = 10 if (lang_en and lang_hk) else len(captions)
+                        for idx in range(start_i, min(end_i, len(captions))):
+                            caption_text = captions[idx]
+                            suffix_parts = [p for p in [keywords_clean, hashtags_clean] if p]
+                            suffix = "\n".join(suffix_parts)
+                            full_tweet = f"{caption_text.strip()}\n\n{suffix}" if suffix else caption_text.strip()
+
+                            st.markdown(f"**English Option #{idx - start_i + 1}** ({len(full_tweet)} / 280 chars)")
+                            with st.container(border=True):
+                                st.text(full_tweet)
+                            render_action_buttons(full_tweet, idx + 1)
+                            st.write("")
+                    tab_idx += 1
+
+                if lang_hk:
+                    with tabs[tab_idx]:
+                        start_i = 10 if (lang_en and lang_hk) else 0
+                        end_i = 20 if (lang_en and lang_hk) else len(captions)
+                        for idx in range(start_i, min(end_i, len(captions))):
+                            caption_text = captions[idx]
+                            suffix_parts = [p for p in [keywords_clean, hashtags_clean] if p]
+                            suffix = "\n".join(suffix_parts)
+                            full_tweet = f"{caption_text.strip()}\n\n{suffix}" if suffix else caption_text.strip()
+
+                            st.markdown(f"**HK Cantonese Option #{idx - start_i + 1}** ({len(full_tweet)} / 280 chars)")
+                            with st.container(border=True):
+                                st.text(full_tweet)
+                            render_action_buttons(full_tweet, idx + 1)
+                            st.write("")
+
+            except Exception as e:
+                st.error(f"Error generating posts: {str(e)}")

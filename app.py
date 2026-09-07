@@ -92,13 +92,13 @@ if "2) Enter YouTube video links" in inspiration_source:
                 if video_id_match:
                     vid_id = video_id_match.group(1)
                     
-                    # Updated method call compatible with latest youtube-transcript-api versions
                     try:
                         transcript_list = YouTubeTranscriptApi().fetch(vid_id, languages=['en', 'zh-Hant', 'zh-HK', 'th'])
                     except Exception:
                         transcript_list = YouTubeTranscriptApi().fetch(vid_id)
                         
-                    full_transcript = " ".join([t.get('text', '') for t in transcript_list])
+                    # Fixed object property extraction instead of dictionary .get()
+                    full_transcript = " ".join([getattr(t, 'text', str(t)) for t in transcript_list])
                     extracted_transcripts.append(f"Source URL ({url}):\n{full_transcript[:3000]}")
             except Exception as e:
                 st.warning(f"Could not fetch subtitles for {url} (Note: YouTube cloud hosting IP blocks can occur on public platforms): {str(e)}")

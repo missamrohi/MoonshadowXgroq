@@ -5,7 +5,6 @@ import time
 import urllib.parse
 from groq import Groq
 import streamlit.components.v1 as components
-import youtube_transcript_api
 from youtube_transcript_api import YouTubeTranscriptApi
 
 # Page configuration
@@ -84,21 +83,25 @@ if "2) Enter YouTube video links" in inspiration_source:
     )
     
     if yt_input.strip():
-        # Extract URLs
         urls = [url.strip() for url in re.split(r'[\n,\s]+', yt_input) if url.strip()]
         extracted_transcripts = []
         
         for url in urls[:4]:
             try:
-                # Extract video ID
                 video_id_match = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11}).*', url)
                 if video_id_match:
                     vid_id = video_id_match.group(1)
-                    transcript_list = YouTubeTranscriptApi.get_transcript(vid_id, languages=['en', 'zh-Hant', 'zh-HK', 'th'])
-                    full_transcript = " ".join([t['text'] for t in transcript_list])
-                    extracted_transcripts.append(f"Source URL ({url}):\n{full_transcript[:3000]}") # Truncate to save tokens
+                    
+                    # Updated method call compatible with latest youtube-transcript-api versions
+                    try:
+                        transcript_list = YouTubeTranscriptApi().fetch(vid_id, languages=['en', 'zh-Hant', 'zh-HK', 'th'])
+                    except Exception:
+                        transcript_list = YouTubeTranscriptApi().fetch(vid_id)
+                        
+                    full_transcript = " ".join([t.get('text', '') for t in transcript_list])
+                    extracted_transcripts.append(f"Source URL ({url}):\n{full_transcript[:3000]}")
             except Exception as e:
-                st.warning(f"Could not fetch subtitles for {url}: {str(e)}")
+                st.warning(f"Could not fetch subtitles for {url} (Note: YouTube cloud hosting IP blocks can occur on public platforms): {str(e)}")
         
         if extracted_transcripts:
             youtube_transcripts_text = "\n\n".join(extracted_transcripts)
@@ -228,7 +231,6 @@ if st.button("🔥 Generate Posts", type="primary", disabled=btn_disabled):
               Written in natural HK Cantonese (spoken HK Chinese / 廣東話) as used on Threads/X.
             """)
 
-        # Set inspiration instructions based on option choice
         if "2) Enter YouTube video links" in inspiration_source and youtube_transcripts_text:
             inspiration_directive = f"""
             Inspiration Mode: Use the following YouTube video subtitle/dialogue transcripts as the core thematic background and storyline context for generating the posts:
@@ -271,7 +273,7 @@ if st.button("🔥 Generate Posts", type="primary", disabled=btn_disabled):
         Output MUST be strictly a valid JSON array of EXACTLY {total_requested} strings. Return ONLY the raw JSON array. Do not include markdown code blocks (like ```json), introduction, or extra text.
         """
 
-        with st.spinner("Generating fresh posts with Groq (gpt-oss-120b)..."):
+        with st.spinner("Generating fresh posts with Groq (openai/gpt-oss-120b)..."):
             try:
                 chat_completion = client.chat.completions.create(
                     messages=[

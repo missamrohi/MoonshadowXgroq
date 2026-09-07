@@ -232,7 +232,7 @@ if st.button("🔥 Generate Posts", type="primary", disabled=btn_disabled):
         Output MUST be strictly a valid JSON array of EXACTLY {total_requested} strings. Return ONLY the raw JSON array. Do not include markdown code blocks (like ```json), introduction, or extra text.
         """
 
-        with st.spinner("Generating fresh posts with Groq (Llama 3.3)..."):
+        with st.spinner("Generating fresh posts with Groq..."):
             try:
                 chat_completion = client.chat.completions.create(
                     messages=[
@@ -245,7 +245,7 @@ if st.button("🔥 Generate Posts", type="primary", disabled=btn_disabled):
                             "content": prompt
                         }
                     ],
-                    model="llama-3.3-70b-versatile",
+                    model="llama-3.1-8b-instant",  # Updated to active Groq model ID
                     temperature=0.8,
                 )
 

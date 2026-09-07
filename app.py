@@ -245,7 +245,7 @@ if st.button("🔥 Generate Posts", type="primary", disabled=btn_disabled):
                             "content": prompt
                         }
                     ],
-                    model="llama-3.1-8b-instant",  # Updated to active Groq model ID
+                    model="openai/gpt-oss-120b",  # Updated to active Groq model ID
                     temperature=0.8,
                 )
 

@@ -63,15 +63,17 @@ st.markdown("### 🔍 Choose Generation Inspiration Source")
 inspiration_source = st.radio(
     "Select where to draw the generative inspiration from:",
     [
-        "1) Crawl live X/web posts using the hashtag or keywords+hashtag",
-        "2) Enter YouTube video links to analyze dialog or subtitles"
+        "1) use hashtag only",
+        "2) use the complete exact same keyword string + hashtag",
+        "3) analyze youtube dialog",
+        "4) user hashtag and youtube links"
     ],
     index=0,
     label_visibility="collapsed"
 )
 
 youtube_transcripts_text = ""
-if "2) Enter YouTube video links" in inspiration_source:
+if "youtube" in inspiration_source.lower():
     st.markdown("#### 📺 YouTube Video Subtitles / Transcripts")
     st.caption("Paste up to 4 YouTube links below (one per line or comma-separated) to feed their dialogue into the prompt generation.")
     
@@ -97,7 +99,6 @@ if "2) Enter YouTube video links" in inspiration_source:
                     except Exception:
                         transcript_list = YouTubeTranscriptApi().fetch(vid_id)
                         
-                    # Fixed object property extraction instead of dictionary .get()
                     full_transcript = " ".join([getattr(t, 'text', str(t)) for t in transcript_list])
                     extracted_transcripts.append(f"Source URL ({url}):\n{full_transcript[:3000]}")
             except Exception as e:
@@ -231,13 +232,17 @@ if st.button("🔥 Generate Posts", type="primary", disabled=btn_disabled):
               Written in natural HK Cantonese (spoken HK Chinese / 廣東話) as used on Threads/X.
             """)
 
-        if "2) Enter YouTube video links" in inspiration_source and youtube_transcripts_text:
-            inspiration_directive = f"""
-            Inspiration Mode: Use the following YouTube video subtitle/dialogue transcripts as the core thematic background and storyline context for generating the posts:
-            {youtube_transcripts_text}
-            """
+        # Configure Inspiration Directive based on user selection
+        if inspiration_source.startswith("1)"):
+            inspiration_directive = f"Inspiration Mode: Reference live online social discourse and trend sentiment anchored exclusively around the hashtag '{hashtags_clean}'."
+        elif inspiration_source.startswith("2)"):
+            inspiration_directive = f"Inspiration Mode: Reference live online social discourse and trend sentiment anchored around the complete exact keyword string '{keywords_clean}' combined with hashtag '{hashtags_clean}'."
+        elif inspiration_source.startswith("3)"):
+            inspiration_directive = f"Inspiration Mode: Use the following YouTube video subtitle/dialogue transcripts as the core thematic background and storyline context for generating the posts:\n{youtube_transcripts_text}"
+        elif inspiration_source.startswith("4)"):
+            inspiration_directive = f"Inspiration Mode: Combine both the hashtag '{hashtags_clean}' context and the following YouTube video subtitle/dialogue transcripts as the core thematic background:\n{youtube_transcripts_text}"
         else:
-            inspiration_directive = f"Inspiration Mode: Reference live online social discourse and trend sentiment anchored around the keyword string '{keywords_clean}' and hashtag '{hashtags_clean}'."
+            inspiration_directive = f"Inspiration Mode: Reference live online social discourse and trend sentiment anchored around '{hashtags_clean}'."
 
         history_context = ""
         if st.session_state.previous_tweets:
@@ -291,54 +296,4 @@ if st.button("🔥 Generate Posts", type="primary", disabled=btn_disabled):
                 )
 
                 raw_content = chat_completion.choices[0].message.content.strip()
-                clean_json = re.sub(r'^```json\s*|\s*```$', '', raw_content, flags=re.MULTILINE).strip()
-                captions = json.loads(clean_json)
-
-                st.session_state.previous_tweets.extend(captions)
-
-                st.subheader("🎉 Ready-to-Post Captions")
-
-                tabs_to_create = []
-                if lang_en:
-                    tabs_to_create.append("🇬🇧 Native English (10)")
-                if lang_hk:
-                    tabs_to_create.append("🇭🇰 HK Cantonese (10)")
-
-                tabs = st.tabs(tabs_to_create)
-
-                tab_idx = 0
-                if lang_en:
-                    with tabs[tab_idx]:
-                        start_i = 0
-                        end_i = 10 if (lang_en and lang_hk) else len(captions)
-                        for idx in range(start_i, min(end_i, len(captions))):
-                            caption_text = captions[idx]
-                            suffix_parts = [p for p in [keywords_clean, hashtags_clean] if p]
-                            suffix = "\n".join(suffix_parts)
-                            full_tweet = f"{caption_text.strip()}\n\n{suffix}" if suffix else caption_text.strip()
-
-                            st.markdown(f"**English Option #{idx - start_i + 1}** ({len(full_tweet)} / 280 chars)")
-                            with st.container(border=True):
-                                st.text(full_tweet)
-                            render_action_buttons(full_tweet, idx + 1)
-                            st.write("")
-                    tab_idx += 1
-
-                if lang_hk:
-                    with tabs[tab_idx]:
-                        start_i = 10 if (lang_en and lang_hk) else 0
-                        end_i = 20 if (lang_en and lang_hk) else len(captions)
-                        for idx in range(start_i, min(end_i, len(captions))):
-                            caption_text = captions[idx]
-                            suffix_parts = [p for p in [keywords_clean, hashtags_clean] if p]
-                            suffix = "\n".join(suffix_parts)
-                            full_tweet = f"{caption_text.strip()}\n\n{suffix}" if suffix else caption_text.strip()
-
-                            st.markdown(f"**HK Cantonese Option #{idx - start_i + 1}** ({len(full_tweet)} / 280 chars)")
-                            with st.container(border=True):
-                                st.text(full_tweet)
-                            render_action_buttons(full_tweet, idx + 1)
-                            st.write("")
-
-            except Exception as e:
-                st.error(f"Error generating posts: {str(e)}")
+                clean_json = re.sub(r'^

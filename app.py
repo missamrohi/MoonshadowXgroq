@@ -5,12 +5,14 @@ import time
 import urllib.parse
 from groq import Groq
 import streamlit.components.v1 as components
+import youtube_transcript_api
+from youtube_transcript_api import YouTubeTranscriptApi
 
 # Page configuration
 st.set_page_config(page_title="Moonshadow X Auto-Generator", page_icon="🌙", layout="centered")
 
 st.title("🌙 Moonshadow X Auto-Generator")
-st.write("Generate trending posts inspired by current X.com conversations using your campaign keywords and hashtag.")
+st.write("Generate trending posts inspired by current X conversations or YouTube video dialogues using your campaign keywords and hashtag.")
 
 # 1. SECURITY: Load Groq API key safely
 api_key = st.secrets.get("GROQ_API_KEY", "")
@@ -57,17 +59,50 @@ twist_angle = st.selectbox("Tone / Focus Angle", [
     "Emotional & Character Dynamic Analysis"
 ])
 
-# --- CRAWL INSPIRATION OPTION ---
-st.markdown("### 🔍 Tweet Inspiration Strategy")
-crawl_option = st.radio(
-    "Choose how the model gathers generative inspiration:",
+# --- GENERATION INSPIRATION SOURCE OPTION ---
+st.markdown("### 🔍 Choose Generation Inspiration Source")
+inspiration_source = st.radio(
+    "Select where to draw the generative inspiration from:",
     [
-        "Crawl live X/web posts *using* the keyword string as inspiration",
-        "Generate *without* using the keyword string as crawling inspiration (pure creative prompt)"
+        "1) Crawl live X/web posts using the hashtag or keywords+hashtag",
+        "2) Enter YouTube video links to analyze dialog or subtitles"
     ],
     index=0,
     label_visibility="collapsed"
 )
+
+youtube_transcripts_text = ""
+if "2) Enter YouTube video links" in inspiration_source:
+    st.markdown("#### 📺 YouTube Video Subtitles / Transcripts")
+    st.caption("Paste up to 4 YouTube links below (one per line or comma-separated) to feed their dialogue into the prompt generation.")
+    
+    yt_input = st.text_area(
+        "YouTube Links",
+        value="",
+        placeholder="https://www.youtube.com/watch?v=...\nhttps://youtu.be/...",
+        height=100
+    )
+    
+    if yt_input.strip():
+        # Extract URLs
+        urls = [url.strip() for url in re.split(r'[\n,\s]+', yt_input) if url.strip()]
+        extracted_transcripts = []
+        
+        for url in urls[:4]:
+            try:
+                # Extract video ID
+                video_id_match = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11}).*', url)
+                if video_id_match:
+                    vid_id = video_id_match.group(1)
+                    transcript_list = YouTubeTranscriptApi.get_transcript(vid_id, languages=['en', 'zh-Hant', 'zh-HK', 'th'])
+                    full_transcript = " ".join([t['text'] for t in transcript_list])
+                    extracted_transcripts.append(f"Source URL ({url}):\n{full_transcript[:3000]}") # Truncate to save tokens
+            except Exception as e:
+                st.warning(f"Could not fetch subtitles for {url}: {str(e)}")
+        
+        if extracted_transcripts:
+            youtube_transcripts_text = "\n\n".join(extracted_transcripts)
+            st.success(f"Successfully loaded and parsed subtitles from {len(extracted_transcripts)} YouTube video(s)!")
 
 # --- LANGUAGE CHECKBOXES ---
 st.markdown("### 🌐 Select Language(s)")
@@ -193,10 +228,14 @@ if st.button("🔥 Generate Posts", type="primary", disabled=btn_disabled):
               Written in natural HK Cantonese (spoken HK Chinese / 廣東話) as used on Threads/X.
             """)
 
-        if "using the keyword string" in crawl_option:
-            inspiration_directive = f"Inspiration Mode: Reference community discourse themes anchored around the keyword string '{keywords_clean}'."
+        # Set inspiration instructions based on option choice
+        if "2) Enter YouTube video links" in inspiration_source and youtube_transcripts_text:
+            inspiration_directive = f"""
+            Inspiration Mode: Use the following YouTube video subtitle/dialogue transcripts as the core thematic background and storyline context for generating the posts:
+            {youtube_transcripts_text}
+            """
         else:
-            inspiration_directive = f"Inspiration Mode: Generate independently without relying on keyword discourse lookup, focusing purely on creative prompt angles."
+            inspiration_directive = f"Inspiration Mode: Reference live online social discourse and trend sentiment anchored around the keyword string '{keywords_clean}' and hashtag '{hashtags_clean}'."
 
         history_context = ""
         if st.session_state.previous_tweets:
@@ -232,7 +271,7 @@ if st.button("🔥 Generate Posts", type="primary", disabled=btn_disabled):
         Output MUST be strictly a valid JSON array of EXACTLY {total_requested} strings. Return ONLY the raw JSON array. Do not include markdown code blocks (like ```json), introduction, or extra text.
         """
 
-        with st.spinner("Generating fresh posts with Groq..."):
+        with st.spinner("Generating fresh posts with Groq (gpt-oss-120b)..."):
             try:
                 chat_completion = client.chat.completions.create(
                     messages=[
@@ -245,7 +284,7 @@ if st.button("🔥 Generate Posts", type="primary", disabled=btn_disabled):
                             "content": prompt
                         }
                     ],
-                    model="openai/gpt-oss-120b",  # Updated to active Groq model ID
+                    model="openai/gpt-oss-120b",
                     temperature=0.8,
                 )
 
